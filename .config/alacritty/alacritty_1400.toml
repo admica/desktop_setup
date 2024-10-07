@@ -1,0 +1,7 @@
+import = [
+  "~/.config/alacritty/alacritty.toml"
+]
+
+[window.position]
+x = 1400
+y = 0
