@@ -1,0 +1,94 @@
+#!/bin/bash
+# admica 2024-10-21
+# Description:
+#   Fancy bash prompt with no requirements other than nerd fonts for icons
+# Install:
+#   rename this script to .bash_prompt and source it in your .bashrc
+
+# Icons (Nerd Font glyphs)
+GIT_ICON=$'\uE725'
+PYTHON_ICON=$'\uE606'
+NODEJS_ICON=$'\ue718'
+RUST_ICON=$'\ue7a8'
+GOLANG_ICON=$'\uf1a0'
+PHP_ICON=$'\ue73d'
+
+# Colors
+USER_BLUE="\[\033[38;2;9;12;12;48;2;118;159;240m\]"    # fg:#090c0c bg:#769ff0
+HOST_BLUE="\[\033[38;2;9;12;12;48;2;95;122;204m\]"     # fg:#090c0c bg:#5f7acc
+PATH_COLOR="\[\033[38;2;227;229;229;48;2;57;66;96m\]"  # fg:#e3e5e5 bg:#394260
+GIT_COLOR="\[\033[38;2;118;159;240;48;2;33;39;54m\]"   # fg:#769ff0 bg:#212736
+RESET="\[\033[0m\]"
+
+# Function to check for specific file types in current directory
+has_file_type() {
+    local pattern=$1
+    find . -maxdepth 1 -type f -name "$pattern" -print -quit 2>/dev/null | grep -q .
+}
+
+# Function to get Python version if .py files exist
+get_python_version() {
+    if has_file_type "*.py" && command -v python &> /dev/null; then
+        echo " ${PYTHON_ICON}($(python -V 2>&1 | cut -d' ' -f2))"
+    fi
+}
+
+# Function to get Node.js version if package.json or .js files exist
+get_nodejs_version() {
+    if (has_file_type "package.json" || has_file_type "*.js") && command -v node &> /dev/null; then
+        echo " ${NODEJS_ICON}($(node -v | cut -c2-))"
+    fi
+}
+
+# Function to get Rust version if Cargo.toml or .rs files exist
+get_rust_version() {
+    if (has_file_type "Cargo.toml" || has_file_type "*.rs") && command -v rustc &> /dev/null; then
+        echo " ${RUST_ICON}($(rustc --version | cut -d' ' -f2))"
+    fi
+}
+
+# Function to get Go version if go.mod or .go files exist
+get_golang_version() {
+    if (has_file_type "go.mod" || has_file_type "*.go") && command -v go &> /dev/null; then
+        echo " ${GOLANG_ICON}($(go version | cut -d' ' -f3 | cut -c3-))"
+    fi
+}
+
+# Function to get PHP version if .php files exist
+get_php_version() {
+    if has_file_type "*.php" && command -v php &> /dev/null; then
+        echo " ${PHP_ICON}($(php -v | head -n1 | cut -d' ' -f2))"
+    fi
+}
+
+# Function to get Git branch and status
+parse_git() {
+    local branch=$(git branch 2>/dev/null | sed -n 's/* \(.*\)/\1/p')
+    if [ -n "$branch" ]; then
+        # Get status counts
+        local staged=$(git diff --staged --numstat 2>/dev/null | wc -l)
+        local modified=$(git diff --numstat 2>/dev/null | wc -l)
+        local untracked=$(git ls-files --others --exclude-standard 2>/dev/null | wc -l)
+        # Build status string
+        local status=""
+        local count=$((staged + modified + untracked))
+        if [ $count -gt 0 ]; then
+            status="[+${count}]"
+        fi
+        echo " ${GIT_ICON} ${branch}${status}"
+    fi
+}
+
+# Main prompt function
+set_bash_prompt() {
+    if [ $? -eq 0 ]; then
+        pcol='\e[0;32m'
+    else
+        pcol='\e[0;31m'
+    fi
+    local time=$(date +"%H:%M")
+    PS1="${USER_BLUE}\u${HOST_BLUE}@\h${PATH_COLOR}:\w${GIT_COLOR}$(parse_git)$(get_python_version)$(get_nodejs_version)$(get_rust_version)$(get_php_version)${RESET} ${time} ${pcol}❯ ${RESET}"
+}
+
+# Set up prompt command
+PROMPT_COMMAND=set_bash_prompt
