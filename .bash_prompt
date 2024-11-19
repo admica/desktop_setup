@@ -1,0 +1,186 @@
+#!/bin/bash
+
+# Pre-command timestamp
+PROMPT_START_TIME=""
+preexec() {
+    PROMPT_START_TIME=$(date +%s%N)
+}
+
+# Set up DEBUG trap to run preexec before each command
+trap '[[ "${BASH_COMMAND}" != "${PROMPT_COMMAND}" ]] && preexec' DEBUG
+
+# Icons (using Nerd Font glyphs)
+GIT_ICON=$'\[\uE725\]'
+PYTHON_ICON=$'\[\uE606\]'
+NODEJS_ICON=$'\[\ue718\]'
+RUST_ICON=$'\[\ue7a8\]'
+GOLANG_ICON=$'\[\uf1a0\]'
+PHP_ICON=$'\[\ue73d\]'
+
+# Username colors - warm/neutral
+readonly USERNAME_COLORS=(
+    "38;5;216"  # peach
+    "38;5;180"  # tan
+    "38;5;222"  # light gold
+    "38;5;229"  # cream
+    "38;5;150"  # sage green
+    "38;5;114"  # moss green
+    "38;5;109"  # steel blue
+    "38;5;146"  # periwinkle
+    "38;5;139"  # dusty purple
+    "38;5;168"  # rose pink
+    "38;5;174"  # mauve
+    "38;5;167"  # dark coral
+    "38;5;173"  # terra cotta
+    "38;5;179"  # golden brown
+    "38;5;187"  # light grey
+    "38;5;203"  # coral red
+)
+
+# Hostname colors
+readonly HOSTNAME_COLORS=(
+    "38;5;75"   # brighter sky blue
+    "38;5;111"  # clearer steel blue
+    "38;5;147"  # soft lavender
+    "38;5;141"  # brighter purple
+    "38;5;98"   # rich purple
+    "38;5;36"   # emerald green
+    "38;5;43"   # bright teal
+    "38;5;29"   # deep forest green
+    "38;5;114"  # bright sage
+    "38;5;195"  # ice blue
+    "38;5;153"  # powder blue
+    "38;5;97"   # deep purple
+    "38;5;61"   # royal blue
+    "38;5;30"   # dark turquoise
+    "38;5;81"   # bright turquoise
+    "38;5;69"   # strong blue
+)
+
+# Function to generate a consistent hash from a string
+get_color_index() {
+    local input="$1"
+    local hash=0
+
+    for (( i=0; i<${#input}; i++ )); do
+        printf -v ascii "%d" "'${input:$i:1}"
+        hash=$(( (hash * 31 + ascii) % 16 ))
+    done
+
+    echo $hash
+}
+
+# Function to get color for username
+get_user_color() {
+    local username="$1"
+    local index=$(get_color_index "$username")
+    echo "\[\033[${USERNAME_COLORS[$index]}m\]"
+}
+
+# Function to get color for hostname
+get_host_color() {
+    local hostname="$1"
+    local index=$(get_color_index "$hostname")
+    echo "\[\033[${HOSTNAME_COLORS[$index]}m\]"
+}
+
+# Static colors
+PATH_COLOR="\[\033[38;2;227;229;229;48;2;57;66;96m\]"  # fg:#e3e5e5 bg:#394260
+GIT_COLOR="\[\033[38;2;118;159;240;48;2;33;39;54m\]"   # fg:#769ff0 bg:#212736
+RESET="\[\033[0m\]"
+
+# Function to check for specific file types in current directory
+has_file_type() {
+    local pattern=$1
+    find . -maxdepth 1 -type f -name "$pattern" -print -quit 2>/dev/null | grep -q .
+}
+
+# Function to get Python version if .py files exist
+get_python_version() {
+    if has_file_type "*.py" && command -v python &> /dev/null; then
+        echo " ${PYTHON_ICON} ($(python -V 2>&1 | cut -d' ' -f2))"
+    fi
+}
+
+# Function to get Node.js version if package.json or .js files exist
+get_nodejs_version() {
+    if (has_file_type "package.json" || has_file_type "*.js") && command -v node &> /dev/null; then
+        echo " ${NODEJS_ICON} ($(node -v | cut -c2-))"
+    fi
+}
+
+# Function to get Rust version if Cargo.toml or .rs files exist
+get_rust_version() {
+    if (has_file_type "Cargo.toml" || has_file_type "*.rs") && command -v rustc &> /dev/null; then
+        echo " ${RUST_ICON} ($(rustc --version | cut -d' ' -f2))"
+    fi
+}
+
+# Function to get Go version if go.mod or .go files exist
+get_golang_version() {
+    if (has_file_type "go.mod" || has_file_type "*.go") && command -v go &> /dev/null; then
+        echo " ${GOLANG_ICON} ($(go version | cut -d' ' -f3 | cut -c3-))"
+    fi
+}
+
+# Function to get PHP version if .php files exist
+get_php_version() {
+    if has_file_type "*.php" && command -v php &> /dev/null; then
+        echo " ${PHP_ICON} ($(php -v | head -n1 | cut -d' ' -f2))"
+    fi
+}
+
+# Function to get Git branch and status
+parse_git() {
+    local branch=$(git branch 2>/dev/null | sed -n 's/* \(.*\)/\1/p')
+    if [ -n "$branch" ]; then
+        # Get status counts
+        local staged=$(git diff --staged --numstat 2>/dev/null | wc -l)
+        local modified=$(git diff --numstat 2>/dev/null | wc -l)
+        local untracked=$(git ls-files --others --exclude-standard 2>/dev/null | wc -l)
+        # Build status string
+        local status=""
+        local count=$((staged + modified + untracked))
+        if [ $count -gt 0 ]; then
+            status="[+${count}]"
+        fi
+        echo " ${GIT_ICON} ${branch}${status}"
+    fi
+}
+
+# Main prompt function
+set_bash_prompt() {
+    local last_status=$?
+
+    # Calculate command duration if we have a start time
+    local duration=""
+    if [ -n "$PROMPT_START_TIME" ]; then
+        local end_time=$(date +%s%N)
+        local duration_ns=$((end_time - PROMPT_START_TIME))
+
+        # Convert to appropriate units and format
+        if [ $duration_ns -lt 10000000000 ]; then # 10000 ms (10s)
+            duration="\[\e[38;5;246m\] took $(($duration_ns/1000000))ms\[\e[0m\]"
+        elif [ $duration_ns -lt 60000000000 ]; then # 60 seconds
+            duration="\[\e[38;5;246m\] took $(($duration_ns/1000000000))s\[\e[0m\]"
+        else
+            duration="\[\e[38;5;246m\] took $(($duration_ns/60000000000))m$((($duration_ns/1000000000)%60))s\[\e[0m\]"
+        fi
+    fi
+    PROMPT_START_TIME=""  # Reset for next command
+
+    if [ $last_status -eq 0 ]; then
+        pcol='\[\e[0;32m\]'
+    else
+        pcol='\[\e[0;31m\]'
+    fi
+    local time=$(date +"%H:%M")
+
+    # Get dynamic colors based on username and hostname
+    local user_color=$(get_user_color "$USER")
+    local host_color=$(get_host_color "$HOSTNAME")
+
+    PS1="${user_color}\u${host_color}@\h${PATH_COLOR}:\w${GIT_COLOR}$(parse_git)$(get_python_version)$(get_nodejs_version)$(get_rust_version)$(get_php_version)${RESET} ${time}${duration}\n${pcol}\$${RESET} "
+}
+
+PROMPT_COMMAND=set_bash_prompt
