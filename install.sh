@@ -12,6 +12,8 @@ RED='\033[1;31m'
 CYAN='\033[0;36m'
 NC='\033[0m' # No Color
 
+LOGFILE="/tmp/desktop_setup_$(date +%Y%m%d_%H%M%S).log"
+
 print_header() {
     local timestamp=$(date '+%Y-%m-%d %H:%M:%S')
     local message="[${timestamp}] ### $1 ###"
@@ -40,18 +42,18 @@ print_detail() {
     echo "$message" >> "$LOGFILE"
 }
 
-print_header "Copying Files"
+print_header "Copy"
 print_detail "copy .bash_prompt"
 cp -f .bash_prompt ~/
 
-print_header "Rsync Dirs"
+print_header "Rsync"
 print_detail "rsync .local -> ~/"
 rsync -avzh ./.local/ ~/.local/
 
 print_detail "rsync .config -> ~/"
 rsync -avzh ./.local/ ~/.config/
 
-print_header "update font cache"
+print_header "Update font cache"
 fc-cache -fv
 
 print_header "Check .bashrc"
