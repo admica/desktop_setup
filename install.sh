@@ -42,28 +42,41 @@ print_detail() {
     echo "$message" >> "$LOGFILE"
 }
 
+print_header "Checking requirements"
+print_detail "rsync"
+command -v rsync >/dev/null 2>&1 || { print_error "rsync is required but not installed."; }
+
+print_detail "fc-cache"
+command -v fc-cache >/dev/null 2>&1 || { print_error "fontconfig is required but not installed."; }
+print_detail "Done"
+
 print_header "Copy"
 print_detail "copy .bash_prompt"
 cp -f .bash_prompt ~/
+
+print_detail "copy .vimrc"
+cp -f .vimrc ~/
 
 print_header "Rsync"
 print_detail "rsync .local -> ~/"
 rsync -avzh ./.local/ ~/.local/
 
 print_detail "rsync .config -> ~/"
-rsync -avzh ./.local/ ~/.config/
+rsync -avzh ./.config/ ~/.config/
 
-print_header "Update font cache"
+print_header "Fonts"
+print_detail "Update font cache"
 fc-cache -fv
 
-print_header "Check .bashrc"
+print_header "Bashrc"
+print_detail "Checking .bashrc"
 grep "bash_prompt" ~/.bashrc 2>/dev/null
 
 if [[ $? -ne 0 ]]; then
     print_detail "adding source ~/.bash_prompt to ~/.bashrc"
     echo "source ~/.bash_prompt" >> ~/.bashrc
 else
-    print_detail "bash_prompt already called from .bashrc"
+    print_detail "bash_prompt found in .bashrc, skipping..."
 fi
 
 print_header "Installation Complete!"
