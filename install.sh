@@ -117,6 +117,23 @@ print_detail "fc-cache"
 command -v fc-cache >/dev/null 2>&1 || { print_error "fontconfig is required but not installed."; exit 1; }
 print_detail "Done"
 
+# Install full vim with syntax highlighting on Fedora (default vim-minimal lacks +syntax)
+if [ -f /etc/fedora-release ]; then
+    print_header "Vim Setup (Fedora)"
+    # Check if vim has syntax support
+    if /usr/bin/vi --version 2>/dev/null | grep -q "+syntax"; then
+        print_detail "vim-enhanced already installed."
+    else
+        print_action "Installing vim-enhanced for syntax highlighting..."
+        if [ "$DRY_RUN" = true ]; then
+            print_dry_run "sudo dnf install -y vim-enhanced"
+        else
+            sudo dnf install -y vim-enhanced
+            print_detail "vim-enhanced installed."
+        fi
+    fi
+fi
+
 print_header "Neovim Setup"
 if command -v nvim >/dev/null 2>&1; then
     print_detail "Neovim is already installed."
