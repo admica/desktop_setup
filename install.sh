@@ -117,13 +117,15 @@ print_detail "fc-cache"
 command -v fc-cache >/dev/null 2>&1 || { print_error "fontconfig is required but not installed."; exit 1; }
 print_detail "Done"
 
-# Install full vim with syntax highlighting on Fedora (default vim-minimal lacks +syntax)
-if [ -f /etc/fedora-release ]; then
-    print_header "Vim Setup (Fedora)"
-    # Check if vim has syntax support
+# Install full vim with syntax highlighting (minimal vim packages lack +syntax)
+install_full_vim() {
     if /usr/bin/vi --version 2>/dev/null | grep -q "+syntax"; then
-        print_detail "vim-enhanced already installed."
-    else
+        print_detail "Full vim with syntax support already installed."
+        return 0
+    fi
+
+    if [ -f /etc/fedora-release ]; then
+        print_header "Vim Setup (Fedora)"
         print_action "Installing vim-enhanced for syntax highlighting..."
         if [ "$DRY_RUN" = true ]; then
             print_dry_run "sudo dnf install -y vim-enhanced"
@@ -131,33 +133,78 @@ if [ -f /etc/fedora-release ]; then
             sudo dnf install -y vim-enhanced
             print_detail "vim-enhanced installed."
         fi
+    elif [ -f /etc/debian_version ]; then
+        print_header "Vim Setup (Debian/Ubuntu)"
+        print_action "Installing vim for syntax highlighting..."
+        if [ "$DRY_RUN" = true ]; then
+            print_dry_run "sudo apt-get install -y vim"
+        else
+            sudo apt-get install -y vim
+            print_detail "vim installed."
+        fi
     fi
-fi
+}
+install_full_vim
 
 print_header "Neovim Setup"
-if command -v nvim >/dev/null 2>&1; then
+if nvim --version >/dev/null 2>&1; then
     print_detail "Neovim is already installed."
 else
     print_action "Neovim not found. Installing latest stable AppImage..."
 
+    # Determine architecture
+    ARCH=$(uname -m)
+    case "$ARCH" in
+        x86_64)  NVIM_APPIMAGE="nvim-linux-x86_64.appimage" ;;
+        aarch64) NVIM_APPIMAGE="nvim-linux-arm64.appimage" ;;
+        *)       print_error "Unsupported architecture: $ARCH"; exit 1 ;;
+    esac
+    NVIM_URL="https://github.com/neovim/neovim/releases/latest/download/${NVIM_APPIMAGE}"
+
     if [ "$DRY_RUN" = true ]; then
         print_dry_run "mkdir -p ~/.local/bin"
-        print_dry_run "curl -L -o ~/.local/bin/nvim https://github.com/neovim/neovim/releases/latest/download/nvim.appimage"
-        print_dry_run "chmod u+x ~/.local/bin/nvim"
+        print_dry_run "curl -L -o /tmp/nvim.appimage $NVIM_URL"
+        if [ "$IS_WSL" = true ]; then
+            print_dry_run "Extract AppImage (WSL lacks FUSE support)"
+            print_dry_run "Create wrapper script at ~/.local/bin/nvim"
+        else
+            print_dry_run "mv /tmp/nvim.appimage ~/.local/bin/nvim"
+            print_dry_run "chmod u+x ~/.local/bin/nvim"
+        fi
     else
-        # Create local bin if it doesn't exist
         mkdir -p ~/.local/bin
 
-        # Download AppImage
-        print_detail "Downloading nvim.appimage..."
-        curl -L -o ~/.local/bin/nvim https://github.com/neovim/neovim/releases/latest/download/nvim.appimage
+        print_detail "Downloading $NVIM_APPIMAGE..."
+        curl -L -o /tmp/nvim.appimage "$NVIM_URL"
 
         if [ $? -eq 0 ]; then
             print_detail "Download successful."
-            chmod u+x ~/.local/bin/nvim
-            print_detail "Installed to ~/.local/bin/nvim"
+            chmod u+x /tmp/nvim.appimage
 
-            # Add to PATH for this session so we can use it immediately if needed
+            if [ "$IS_WSL" = true ]; then
+                # WSL lacks FUSE support, so extract the AppImage
+                print_detail "Extracting AppImage (WSL lacks FUSE)..."
+                (
+                    cd /tmp
+                    ./nvim.appimage --appimage-extract >/dev/null 2>&1
+                    rm -rf ~/.local/nvim-appimage
+                    mv squashfs-root ~/.local/nvim-appimage
+                    rm /tmp/nvim.appimage
+                )
+
+                # Create wrapper script
+                cat > ~/.local/bin/nvim << 'EOF'
+#!/bin/bash
+exec ~/.local/nvim-appimage/usr/bin/nvim "$@"
+EOF
+                chmod u+x ~/.local/bin/nvim
+                print_detail "Installed extracted Neovim to ~/.local/nvim-appimage/"
+            else
+                # Native Linux - use AppImage directly
+                mv /tmp/nvim.appimage ~/.local/bin/nvim
+                print_detail "Installed to ~/.local/bin/nvim"
+            fi
+
             export PATH="$HOME/.local/bin:$PATH"
         else
             print_error "Failed to download Neovim AppImage."

@@ -180,7 +180,7 @@ set_bash_prompt() {
     local user_color=$(get_user_color "$USER")
     local host_color=$(get_host_color "$HOSTNAME")
 
-    PS1="${user_color}\u${host_color}@\h${PATH_COLOR}:\w${GIT_COLOR}$(parse_git)$(get_python_version)$(get_nodejs_version)$(get_rust_version)$(get_php_version)${RESET} ${time}${duration}\n${pcol}\$${RESET} "
+    PS1="${user_color}\u${host_color}@\h${PATH_COLOR}:\w${GIT_COLOR}$(parse_git)$(get_python_version)$(get_nodejs_version)$(get_rust_version)$(get_golang_version)$(get_php_version)${RESET} ${time}${duration}\n${pcol}\$${RESET} "
 }
 
 PROMPT_COMMAND=set_bash_prompt
