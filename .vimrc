@@ -1,6 +1,12 @@
 " Enable syntax highlighting
 syntax on
 
+" Enable filetype detection for syntax highlighting
+filetype plugin indent on
+
+" Enable 256 colors in terminal
+set t_Co=256
+
 " Set the encoding to UTF-8
 set encoding=utf-8
 
